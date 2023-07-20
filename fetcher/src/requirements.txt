@@ -1,0 +1,2 @@
+cherrypy [json] == 18.8.*
+requests == 2.31.*
