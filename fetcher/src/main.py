@@ -2,11 +2,20 @@ from fastapi import FastAPI
 from typing import Union
 import requests
 
-app = FastAPI()
-
-@app.get("/")
-def index():
-    return {"hello": "world"}
+app = FastAPI(
+    title="parcel-track-fetcher",
+    description="This `fetcher` serves as a sort of wrapper for tracking parcels through various services.",
+    contact={
+        "name": "See the source code on GitHub",
+        "url": "https://github.com/haseHH/parcel-track",
+    },
+    license_info={
+        "name": "License",
+        "url": "https://github.com/haseHH/parcel-track/blob/main/LICENSE",
+    },
+    docs_url="/",
+    redoc_url=None,
+)
 
 @app.get("/dpd")
 def dpd(parcelno: str, zip: Union[str, None] = None, locale: str = "en_US"):
