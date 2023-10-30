@@ -1,31 +1,25 @@
-import cherrypy
+from fastapi import FastAPI
+from typing import Union
 import requests
 
-class Fetcher(object):
-    @cherrypy.expose
-    @cherrypy.tools.json_out()
-    def index(self):
-        return {
-            'hello': 'world'
-        }
+app = FastAPI()
 
-    @cherrypy.expose
-    @cherrypy.tools.json_out()
-    def dpd(self, parcelno, zip=None):
-        r = requests.get(f"https://tracking.dpd.de/rest/plc/de_DE/{parcelno}")
+@app.get("/")
+def index():
+    return {"hello": "world"}
 
-        if (zip == None):
-            weblink = f"https://my.dpd.de/redirect.aspx?parcelno={parcelno}&action=2"
-        else:
-            weblink = f"https://my.dpd.de/redirect.aspx?zip={zip}&parcelno={parcelno}&action=2"
-            
-        return {
-            'parcelno': parcelno,
-            'zip': zip,
-            'details_link': weblink,
-            'orig': r.json()['parcellifecycleResponse']['parcelLifeCycleData']
-        }
+@app.get("/dpd")
+def dpd(parcelno: str, zip: Union[str, None] = None, locale: str = "en_US"):
+    r = requests.get(f"https://tracking.dpd.de/rest/plc/{locale}/{parcelno}")
 
-if __name__ == '__main__':
-    cherrypy.server.socket_host = '0.0.0.0'
-    cherrypy.quickstart(Fetcher())
+    if (zip == None):
+        weblink = f"https://my.dpd.de/redirect.aspx?parcelno={parcelno}&action=2"
+    else:
+        weblink = f"https://my.dpd.de/redirect.aspx?zip={zip}&parcelno={parcelno}&action=2"
+
+    return {
+        'parcelno': parcelno,
+        'zip': zip,
+        'details_link': weblink,
+        'orig': r.json()['parcellifecycleResponse']['parcelLifeCycleData']
+    }
