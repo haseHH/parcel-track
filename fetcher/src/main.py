@@ -18,7 +18,7 @@ app = FastAPI(
 )
 
 @app.get("/dpd")
-def dpd(parcelno: str, zip: Union[str, None] = None, locale: str = "en_US"):
+def dpd(parcelno: str, zip: str | None = None, locale: str = "en_US"):
     r = requests.get(f"https://tracking.dpd.de/rest/plc/{locale}/{parcelno}")
 
     if (zip == None):
