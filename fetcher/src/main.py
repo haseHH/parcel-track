@@ -15,9 +15,15 @@ app = FastAPI(
     },
     docs_url="/",
     redoc_url=None,
+    openapi_tags=[
+        {
+            "name": "carriers",
+            "description": "These functions represent the supported carriers.",
+        },
+    ],
 )
 
-@app.get("/dpd")
+@app.get("/dpd", tags=["carriers"])
 def dpd(parcelno: str, zip: str | None = None, locale: str = "en_US"):
     r = requests.get(f"https://tracking.dpd.de/rest/plc/{locale}/{parcelno}")
 
