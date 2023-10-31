@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 import requests
+import json
 
 app = FastAPI(
     title="parcel-track-fetcher",
@@ -26,8 +27,8 @@ app = FastAPI(
 #region Models
 class Status(BaseModel):
     id: int
-    code: str
-    name: str
+    code: str | None = None
+    name: str | None = None
     description: str
     hasBeenReached: bool
     isCurrentStatus: bool
@@ -45,6 +46,64 @@ class TrackingInfo(BaseModel):
     status: StatusInfo
     orig: dict | None = None
 #endregion Models
+
+@app.get(
+    "/dhl", tags=["carriers"],
+    summary="DHL Germany",
+    response_model=TrackingInfo,
+    response_description="Tracking info",
+)
+def dhl(parcelno: str, zip: str | None = None, locale: str = "en", includeOriginalApiResponse: bool = False):
+    """
+    Fetch the tracking info of a package carried by DHL Germany.
+
+    - **parcelno**: The number of your parcel.
+    - **zip**: The ZIP code of the recipient. Won't grant any more detail in the tracking status, but setting it will include it in the response.
+    - **locale**: Specifies the language of the status labels and descriptions, default is `en`, other known options include: `de`
+    - **includeOriginalApiResponse**: If `true`, the response will include the original JSON response from the DHL API in `orig`, useful for debugging or adding your own client logic.
+    """
+
+    r = requests.get(
+        url=f"https://www.dhl.de/int-verfolgen/?lang={locale}&piececode={parcelno}",
+        headers={
+            "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+        },
+    )
+
+    for l in r.text.splitlines():
+        if "JSON.parse(" in l:
+            jsonLineRaw = l.strip()
+            break
+    jsonLine = jsonLineRaw.split("JSON.parse(\"", 1)[1].rstrip("\"),").replace("\\\"", "\"")
+    jsonStatusInfo = json.loads(jsonLine)
+
+    statesCount: int = jsonStatusInfo["sendungen"][0]["sendungsdetails"]["sendungsverlauf"]["maximalFortschritt"] + 1
+
+    response: TrackingInfo = {
+        "parcelno": parcelno,
+        "zip": zip,
+        "details_link": f"https://www.dhl.de/{locale}/privatkunden/dhl-sendungsverfolgung.html?piececode={parcelno}",
+        "status": {
+            "statesCount": statesCount,
+            "currentState": jsonStatusInfo["sendungen"][0]["sendungsdetails"]["sendungsverlauf"]["fortschritt"],
+            "states": [],
+        },
+    }
+
+    for i in range(statesCount):
+        state: Status = {
+            "id": i,
+            "description": jsonStatusInfo["sendungen"][0]["sendungsdetails"]["sendungsverlauf"]["events"][i]["status"],
+            "hasBeenReached": i <= response["status"]["currentState"],
+            "isCurrentStatus": i == response["status"]["currentState"],
+            "date": jsonStatusInfo["sendungen"][0]["sendungsdetails"]["sendungsverlauf"]["events"][i].get("datum"),
+        }
+        response["status"]["states"].append(state)
+
+    if (includeOriginalApiResponse):
+        response["orig"] = jsonStatusInfo
+
+    return response
 
 @app.get(
     "/dpd", tags=["carriers"],
