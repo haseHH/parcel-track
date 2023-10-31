@@ -116,7 +116,7 @@ def dpd(parcelno: str, zip: str | None = None, locale: str = "en_US", includeOri
     Fetch the tracking info of a package carried by DPD Germany.
 
     - **parcelno**: The number of your parcel.
-    - **zip**: The ZIP code of the recipient. Won't grant any more detail in the tracking status, but setting it will include it in the `weblink`, saving you a step when opening the official tracking page.
+    - **zip**: The ZIP code of the recipient. Won't grant any more detail in the tracking status, but setting it will include it in the `details_link`, saving you a step when opening the official tracking page.
     - **locale**: Specifies the language of the status labels and descriptions, default is `en_US`, other known options include: `de_DE`, `fr_FR`
     - **includeOriginalApiResponse**: If `true`, the response will include the original JSON response from the DPD API in `orig`, useful for debugging or adding your own client logic.
     """
