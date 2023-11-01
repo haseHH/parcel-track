@@ -29,7 +29,7 @@ class Status(BaseModel):
     id: int
     code: str | None = None
     name: str | None = None
-    description: str
+    description: str | None = None
     hasBeenReached: bool
     isCurrentStatus: bool
     date: str | None = None
@@ -102,6 +102,99 @@ def dhl(parcelno: str, zip: str | None = None, locale: str = "en", includeOrigin
 
     if (includeOriginalApiResponse):
         response["orig"] = jsonStatusInfo
+
+    return response
+
+@app.get(
+    "/hermes", tags=["carriers"],
+    summary="Hermes Germany",
+    response_model=TrackingInfo,
+    response_description="Tracking info",
+)
+def hermes(parcelno: str, zip: str | None = None, locale: str = "en", includeOriginalApiResponse: bool = False):
+    """
+    Fetch the tracking info of a package carried by Hermes Germany.
+
+    - **parcelno**: The number of your parcel.
+    - **zip**: The ZIP code of the recipient. Won't grant any more detail in the tracking status, but setting it will fetch receiver details and some more values in the `orig` section of the response.
+    - **locale**: Specifies the language of the status labels and descriptions, default is `en`, other known options include: `de`
+    - **includeOriginalApiResponse**: If `true`, the response will include the original JSON response from the Hermes API in `orig`, useful for debugging or adding your own client logic.
+    """
+
+    r = requests.get(
+        url=f"https://api.my-deliveries.de/tnt/parcelservice/parceldetails/{parcelno}",
+        headers={
+            "authority": "api.my-deliveries.de",
+            "accept": "*/*",
+            "cache-control": "no-cache, no-store, must-revalidate",
+            "origin": "https://www.myhermes.de",
+            "referer": "https://www.myhermes.de/",
+            "sec-ch-ua": "\"Chromium\";v=\"118\", \"Google Chrome\";v=\"118\", \"Not=A?Brand\";v=\"99\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Linux\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "cross-site",
+            "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+            "x-language": f"{locale}",
+        },
+    )
+    orig = r.json()
+
+    if (zip != None):
+        addr = requests.get(
+            url=f"https://api.my-deliveries.de/tnt/parcelservice/addressdetails/{parcelno}",
+            headers={
+                "authority": "api.my-deliveries.de",
+                "accept": "*/*",
+                "cache-control": "no-cache, no-store, must-revalidate",
+                "origin": "https://www.myhermes.de",
+                "referer": "https://www.myhermes.de/",
+                "sec-ch-ua": "\"Chromium\";v=\"118\", \"Google Chrome\";v=\"118\", \"Not=A?Brand\";v=\"99\"",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "\"Linux\"",
+                "sec-fetch-dest": "empty",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "cross-site",
+                "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+                "x-language": locale,
+                "x-zipcode": zip,
+            },
+        )
+        orig["address"] = addr.json()
+
+    response: TrackingInfo = {
+        "parcelno": parcelno,
+        "zip": zip,
+        "details_link": f"https://www.myhermes.de/empfangen/sendungsverfolgung/sendungsinformation#{parcelno}",
+        "status": {
+            "statesCount": len(orig["parcelHistory"]),
+            "currentState": None,
+            "states": [],
+        },
+    }
+
+    for origState in orig["parcelHistory"]:
+        if origState.get("statusHistoryShortText"):
+            statusName = origState["statusHistoryShortText"]
+        else:
+            statusName = origState["nextStatusHistoryShortText"]
+        state: Status = {
+            "id": origState["statusIndex"],
+            "code": origState["status"],
+            "name": statusName,
+            "description": origState.get("statusHistoryText"),
+            "hasBeenReached": not origState["nextStatus"],
+            "isCurrentStatus": origState["status"] == orig["status"]["parcelStatus"],
+            "date": origState.get("timestamp"),
+        }
+        response["status"]["states"].append(state)
+
+        if state["isCurrentStatus"]:
+            response["status"]["currentState"] = state["id"]
+
+    if (includeOriginalApiResponse):
+        response["orig"] = orig
 
     return response
 
