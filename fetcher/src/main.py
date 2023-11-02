@@ -193,6 +193,28 @@ def hermes(parcelno: str, zip: str | None = None, locale: str = "en", includeOri
         if state["isCurrentStatus"]:
             response["status"]["currentState"] = state["id"]
 
+    #Hermes uses some states that are not in the list of default states
+    if response["status"]["currentState"] == None:
+        #get last "normal" status and increment other status IDs
+        for s in response["status"]["states"]:
+            if s["hasBeenReached"]:
+                lastStatusId = s["id"]
+            else:
+                s["id"] = s["id"] + 1
+
+        #insert new current state
+        currentStatus: Status = {
+            "id": lastStatusId + 1,
+            "code": orig["status"]["parcelStatus"],
+            "name": orig["status"]["text"]["shortText"],
+            "description": orig["status"]["text"]["longText"],
+            "hasBeenReached": True,
+            "isCurrentStatus": True,
+            "date": orig["status"]["timestamp"],
+        }
+        response["status"]["states"].insert(currentStatus["id"], currentStatus)
+        response["status"]["currentState"] = currentStatus["id"]
+
     if (includeOriginalApiResponse):
         response["orig"] = orig
 
