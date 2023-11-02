@@ -192,6 +192,9 @@ def hermes(parcelno: str, zip: str | None = None, locale: str = "en", includeOri
 
         if state["isCurrentStatus"]:
             response["status"]["currentState"] = state["id"]
+            #current states can have more detailed descriptions, overwrite default ones
+            state["name"] = orig["status"]["text"]["shortText"]
+            state["description"] = orig["status"]["text"]["longText"]
 
     #Hermes uses some states that are not in the list of default states
     if response["status"]["currentState"] == None:
