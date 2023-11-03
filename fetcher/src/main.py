@@ -42,6 +42,7 @@ class Status(BaseModel):
 class StatusInfo(BaseModel):
     statesCount: int
     currentState: int | None = None
+    lastUpdate: str | None = None
     states: list[Status]
 
 class TrackingInfo(BaseModel):
@@ -109,6 +110,8 @@ def dhl(parcelno: str, zip: str | None = None, locale: str = "en", includeOrigin
         if s["date"] != None:
             parsedDate = datetime.fromisoformat(s["date"])
             s["date"] = parsedDate.astimezone(OutputTimezone).isoformat(timespec="milliseconds")
+
+    response["status"]["lastUpdate"] = response["status"]["states"][response["status"]["currentState"]]["date"]
 
     if (includeOriginalApiResponse):
         response["orig"] = jsonStatusInfo
@@ -233,6 +236,8 @@ def hermes(parcelno: str, zip: str | None = None, locale: str = "en", includeOri
             parsedDate = datetime.fromisoformat(s["date"])
             s["date"] = parsedDate.astimezone(OutputTimezone).isoformat(timespec="milliseconds")
 
+    response["status"]["lastUpdate"] = response["status"]["states"][response["status"]["currentState"]]["date"]
+
     if (includeOriginalApiResponse):
         response["orig"] = orig
 
@@ -301,6 +306,8 @@ def dpd(parcelno: str, zip: str | None = None, locale: str = "en_US", includeOri
                     break
             parsedDate = dpdTimezone.localize(datetime.strptime(s["date"],dpdDateFormat))
             s["date"] = parsedDate.astimezone(OutputTimezone).isoformat(timespec="milliseconds")
+
+    response["status"]["lastUpdate"] = response["status"]["states"][response["status"]["currentState"]]["date"]
 
     if (includeOriginalApiResponse):
         response["orig"] = r.json()
