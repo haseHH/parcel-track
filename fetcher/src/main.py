@@ -2,6 +2,11 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import requests
 import json
+import os
+import pytz
+from datetime import datetime
+
+OutputTimezone = pytz.timezone(os.getenv("OUTPUT_TZ", "UTC"))
 
 app = FastAPI(
     title="parcel-track-fetcher",
@@ -99,6 +104,11 @@ def dhl(parcelno: str, zip: str | None = None, locale: str = "en", includeOrigin
             "date": jsonStatusInfo["sendungen"][0]["sendungsdetails"]["sendungsverlauf"]["events"][i].get("datum"),
         }
         response["status"]["states"].append(state)
+
+    for s in response["status"]["states"]:
+        if s["date"] != None:
+            parsedDate = datetime.fromisoformat(s["date"])
+            s["date"] = parsedDate.astimezone(OutputTimezone).isoformat(timespec="milliseconds")
 
     if (includeOriginalApiResponse):
         response["orig"] = jsonStatusInfo
@@ -218,6 +228,11 @@ def hermes(parcelno: str, zip: str | None = None, locale: str = "en", includeOri
         response["status"]["states"].insert(currentStatus["id"], currentStatus)
         response["status"]["currentState"] = currentStatus["id"]
 
+    for s in response["status"]["states"]:
+        if s["date"] != None:
+            parsedDate = datetime.fromisoformat(s["date"])
+            s["date"] = parsedDate.astimezone(OutputTimezone).isoformat(timespec="milliseconds")
+
     if (includeOriginalApiResponse):
         response["orig"] = orig
 
@@ -273,6 +288,19 @@ def dpd(parcelno: str, zip: str | None = None, locale: str = "en_US", includeOri
 
         if state["isCurrentStatus"]:
             response["status"]["currentState"] = i
+
+    dpdDateFormat = "%d.%m.%Y, %H:%M"
+    dpdTimezone = pytz.timezone("Europe/Berlin") # the DPD API provides no timezone data, assuming German time is the next best thing
+    for s in response["status"]["states"]:
+        if s["date"] != None:
+            # the scans have greater time accuracy, find matching scan object if available
+            for scan in r.json()["parcellifecycleResponse"]["parcelLifeCycleData"]["scanInfo"]["scan"]:
+                if s["description"] == scan["scanDescription"]["content"][0]:
+                    s["date"] = scan["date"]
+                    dpdDateFormat = "%Y-%m-%dT%H:%M:%S"
+                    break
+            parsedDate = dpdTimezone.localize(datetime.strptime(s["date"],dpdDateFormat))
+            s["date"] = parsedDate.astimezone(OutputTimezone).isoformat(timespec="milliseconds")
 
     if (includeOriginalApiResponse):
         response["orig"] = r.json()
