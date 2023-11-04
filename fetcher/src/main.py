@@ -1,3 +1,4 @@
+import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel
 import requests
@@ -7,6 +8,7 @@ import pytz
 from datetime import datetime
 
 OutputTimezone = pytz.timezone(os.getenv("OUTPUT_TZ", "UTC"))
+DevelopmentEnvironment = os.getenv("DEVELOPMENT", "False") == "True"
 
 app = FastAPI(
     title="parcel-track-fetcher",
@@ -313,3 +315,10 @@ def dpd(parcelno: str, zip: str | None = None, locale: str = "en_US", includeOri
         response["orig"] = r.json()
 
     return response
+
+if __name__ == "__main__":
+    if DevelopmentEnvironment:
+        print("Reload of changed code active!")
+        uvicorn.run("main:app", host="0.0.0.0", port=80, reload=True)
+    else:
+        uvicorn.run("main:app", host="0.0.0.0", port=80)
