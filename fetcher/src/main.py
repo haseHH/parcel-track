@@ -296,7 +296,8 @@ def dpd(parcelno: str, zip: str | None = None, locale: str = "en_US", includeOri
         if state["isCurrentStatus"]:
             response["status"]["currentState"] = i
 
-    dpdDateFormat = "%d.%m.%Y, %H:%M"
+    dpdDateFormatState = "%d.%m.%Y, %H:%M"
+    dpdDateFormatScan = "%Y-%m-%dT%H:%M:%S"
     dpdTimezone = pytz.timezone("Europe/Berlin") # the DPD API provides no timezone data, assuming German time is the next best thing
     for s in response["status"]["states"]:
         if s["date"] != None:
@@ -304,9 +305,11 @@ def dpd(parcelno: str, zip: str | None = None, locale: str = "en_US", includeOri
             for scan in r.json()["parcellifecycleResponse"]["parcelLifeCycleData"]["scanInfo"]["scan"]:
                 if s["description"] == scan["scanDescription"]["content"][0]:
                     s["date"] = scan["date"]
-                    dpdDateFormat = "%Y-%m-%dT%H:%M:%S"
                     break
-            parsedDate = dpdTimezone.localize(datetime.strptime(s["date"],dpdDateFormat))
+            try:
+                parsedDate = dpdTimezone.localize(datetime.strptime(s["date"],dpdDateFormatState))
+            except:
+                parsedDate = dpdTimezone.localize(datetime.strptime(s["date"],dpdDateFormatScan))
             s["date"] = parsedDate.astimezone(OutputTimezone).isoformat(timespec="milliseconds")
 
     response["status"]["lastUpdate"] = response["status"]["states"][response["status"]["currentState"]]["date"]
